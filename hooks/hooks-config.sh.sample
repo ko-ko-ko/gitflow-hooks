@@ -1,0 +1,3 @@
+#!/bin/bash
+
+PREPARE_COMMIT_MSG_ENABLED=1
