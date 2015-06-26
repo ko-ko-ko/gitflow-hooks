@@ -1,6 +1,14 @@
 #!/bin/bash
 
 HOOKS_PATH=$PWD/$GIT_DIR/hooks
+SRC_PATH=$HOOKS_PATH/src
+
+source $HOOKS_PATH/hooks-config.sh
+source $SRC_PATH/functions.sh
+
+if ! $PREPARE_COMMIT_MSG_ENABLED ; then
+    exit 0
+fi
 
 COMMIT_MESSAGE_FILE=$1
 COMMIT_MESSAGE_TYPE=$2
@@ -14,64 +22,29 @@ CURRENT_BRANCH_AUTHOR=""
 CURRENT_BRANCH_ISSUE=""
 CURRENT_BRANCH_DESCRIPTION=""
 
-MERGE_BRANCH_NAME=""
-MERGE_BRANCH_TYPE=""
-MERGE_BRANCH_DATE=""
-MERGE_BRANCH_AUTHOR=""
-MERGE_BRANCH_ISSUE=""
-MERGE_BRANCH_DESCRIPTION=""
-
 GIT_AUTHOR_NAME=$(git config user.name)
 GIT_AUTHOR_EMAIL=$(git config user.email)
 
-function parse_branch_name() {
-    local pattern="^(feature|hotfix|release)/([0-9]{8})-([a-z]+)-([0-9]+)-(.+)$"
-
-    if ! [[ $1 =~ $pattern ]] ; then
-        echo "Branch name not apply pattern:"
-        echo $1
-
-        exit 1
-    fi
-
-    _BRANCH_TYPE=${BASH_REMATCH[1]}
-    _BRANCH_DATE=${BASH_REMATCH[2]}
-    _BRANCH_AUTHOR=${BASH_REMATCH[3]}
-    _BRANCH_ISSUE=${BASH_REMATCH[4]}
-
-    local description=${BASH_REMATCH[5]}
-
-    _BRANCH_DESCRIPTION=${description//-/ }
-}
-
-function build_message() {
-    eval "cat <<EOF
-$(<$1)
-EOF
-" 2> /dev/null
-}
-
-function save_message() {
-    local path=$HOOKS_PATH/templates/$COMMIT_MESSAGE_TYPE.txt
-
-    build_message $path | cat > $COMMIT_MESSAGE_FILE
-}
-
 function make_commit_message() {
-
     parse_branch_name $CURRENT_BRANCH_NAME
 
-    CURRENT_BRANCH_TYPE=$_BRANCH_TYPE
-    CURRENT_BRANCH_DATE=$_BRANCH_DATE
-    CURRENT_BRANCH_AUTHOR=$_BRANCH_AUTHOR
-    CURRENT_BRANCH_ISSUE=$_BRANCH_ISSUE
-    CURRENT_BRANCH_DESCRIPTION=$_BRANCH_DESCRIPTION
+    CURRENT_BRANCH_TYPE=$BRANCH_TYPE
+    CURRENT_BRANCH_DATE=$BRANCH_DATE
+    CURRENT_BRANCH_AUTHOR=$BRANCH_AUTHOR
+    CURRENT_BRANCH_ISSUE=$BRANCH_ISSUE
+    CURRENT_BRANCH_DESCRIPTION=$BRANCH_DESCRIPTION
 
-    save_message
+    local path=$SRC_PATH/$COMMIT_MESSAGE_TYPE.tpl
+
+    render_template $path $COMMIT_MESSAGE_FILE
 }
 
 case $COMMIT_MESSAGE_TYPE in
     message )
+        if ! [[ $COMMIT_MESSAGE_FILE == ".git/MERGE_MSG" ]] ; then
+            exit 0
+        fi
+
         COMMIT_MESSAGE_TYPE="message"
         make_commit_message
         ;;
@@ -80,12 +53,10 @@ case $COMMIT_MESSAGE_TYPE in
         exit 1
         ;;
     merge )
-        echo "merge commit message not implemented now"
-        exit 1
+        exit 0
         ;;
     squash )
-        echo "squash commit message not implemented now"
-        exit 1
+        exit 0
         ;;
     * )
         COMMIT_MESSAGE_TYPE="commit"
